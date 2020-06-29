@@ -1,3 +1,4 @@
+#include <EEPROM.h>
 
 
 
@@ -17,11 +18,13 @@ const int TRIGGER = A0;
 const int SELECTOR = A1;
 const int BAT = A3;
 
-int gap = 1000/fireRate - pushTime;
+int gap;
 int firingMode;
 int needToShoot = 0;
 int triggerStatus=HIGH;
 int lastTriggerStatus = LOW;
+
+void blink(int time, int intervel);
 
 String inputString = "";
 boolean stringComplete = false;
@@ -39,14 +42,25 @@ void setup(){
   digitalWrite(VALVE,LOW);
   inputString.reserve(200);
 
-  digitalWrite(LED_BUILTIN, HIGH);
-  delay(300);
-  digitalWrite(LED_BUILTIN, LOW);
-  delay(300); 
-  digitalWrite(LED_BUILTIN, HIGH);
-  delay(300);
-  digitalWrite(LED_BUILTIN, LOW);
-  delay(300); 
+  if(float(analogRead(BAT))*5/1024 < 3.3){
+    while(1){
+      blink(1,100);
+    }
+  }
+  int tmp;
+  EEPROM.get(8,tmp);
+  if(tmp!=0){
+    EEPROM.get(0,SEMI[0]);
+    EEPROM.get(2,SEMI[1]);
+    EEPROM.get(4,AUTO[0]);
+    EEPROM.get(6,AUTO[1]);
+    EEPROM.get(8,fireRate);
+    EEPROM.get(10,pushTime);
+  }
+  gap = 1000/fireRate - pushTime;
+
+
+  blink(3,300);
 
   Serial.begin(9600);
   serialHello();
@@ -98,6 +112,15 @@ void shoot(){
   // Serial.println(1);
 }
 
+void blink(int time, int intervel){
+  for (int i = 0; i < time; ++i){
+    digitalWrite(LED_BUILTIN, HIGH);
+    delay(intervel);
+    digitalWrite(LED_BUILTIN, LOW);
+    delay(intervel); 
+  }
+}
+
 
 void serialEvent() {
   while (Serial.available()) {
@@ -113,11 +136,13 @@ void serialHello(){
   Serial.println("欢迎使用E2G测试版");
   Serial.println("功能清单");
   Serial.println("READ  : 读取所有信息");
+  Serial.println("SAVE  : 保存当前配置");
   Serial.println("AUTO <整数> <整数> : 自动挡按下，释放扳机射击数，-1即连发，第二位不可为-1");
   Serial.println("SEMI <整数> <整数> : 半自动档按下，释放射击数，-1即连发，第二位不可为-1");
   Serial.println("RATE <整数> : 射速，大小为5~50");
   Serial.println("PUSH <整数> : 推嘴开放时间，单位毫秒，需要小于1000/射速");
   Serial.println("MAGG <整数> : 预供时间，单位秒");
+  Serial.println("SHOT <整数> : 遥控开火，不超过100发");
 }
 
 void serialSettings(){
@@ -133,11 +158,21 @@ void serialSettings(){
     Serial.print(" , ");
     Serial.println(SEMI[1]);
     Serial.print("射速 ");
-    Serial.println(fireRate);
+    Serial.print(fireRate);
+    Serial.println(" r/s");
     Serial.print("推嘴开放时间 ");
-    Serial.println(pushTime);
-    Serial.println("电池电压 ");
-    Serial.println(analogRead(BAT)*5/1024);
+    Serial.print(pushTime);
+    Serial.println(" ms");
+    Serial.print("电池电压 ");
+    Serial.print(float(analogRead(BAT))*5/1024);
+    Serial.print(" V");
+  }else if(inputString.startsWith("SAVE")){
+    EEPROM.put(0,SEMI[0]);
+    EEPROM.put(2,SEMI[1]);
+    EEPROM.put(4,AUTO[0]);
+    EEPROM.put(6,AUTO[1]);
+    EEPROM.put(8,fireRate);
+    EEPROM.put(10,pushTime);
   }else if(inputString.startsWith("AUTO ")){
     dualVar(1);
   }else if(inputString.startsWith("SEMI ")){
@@ -148,6 +183,8 @@ void serialSettings(){
     singleVar(2);
   }else if(inputString.startsWith("MAGG ")){
     singleVar(3);
+  }else if(inputString.startsWith("SHOT ")){
+    singleVar(4);
   }
 }
 
@@ -245,6 +282,18 @@ void singleVar(int mode){
     digitalWrite(MAG,HIGH);
     delay(var*1000);
     digitalWrite(MAG,LOW);
+  }else if(mode == 4){
+    if(var<0||var>100){
+      Serial.print("输入值 ");
+      Serial.print(var);
+      Serial.println(" 为非法参数"); 
+      return;
+    }
+    while(var>0){
+      var--;
+      needToShoot++;
+      shoot();
+    }
   }
   Serial.println("操作成功");
 
