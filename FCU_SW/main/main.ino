@@ -11,12 +11,12 @@ int pushTime = 13;  //开阀时间，需要小于1000/射速
 int minGap = 5;     //关阀时间
 
 
-const int VALVE = 3;
+const int VALVE = 6;
 const int EXT = 5;
-const int MAG = 6;
-const int TRIGGER = A0;
-const int SELECTOR = A1;
-const int BAT = A3;
+const int MAG = 3;
+const int TRIGGER = A3;
+const int SELECTOR = A2;
+const int BAT = A1;
 
 int gap;
 int firingMode;
